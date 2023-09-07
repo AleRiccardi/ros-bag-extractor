@@ -2,292 +2,17 @@
 import decimal
 import multiprocessing
 import os
-from typing import Any, List
+from pathlib import Path
 
 import click
-import cv2
-import numpy as np
-import open3d as o3d
-import sensor_msgs.point_cloud2 as pc2
-import yaml
-from cv_bridge import CvBridge
-from laser_geometry import LaserProjection
-from scipy.spatial.transform import Rotation as R
-from sensor_msgs.msg import Image, LaserScan
-from tqdm import tqdm
 
+from sensors.gps import GPSSensor
+from sensors.image import ImageSensor
+from sensors.imu import IMUSensor
+from sensors.ins import INSSensor
 from sensors.lidar import Lidar, LidarSensor
-from utils.multiprocessors import proc_join_all, proc_start_check
-from utils.pose import Pose
-from utils.tools import (check_topic_bag, create_folder, display_image,
-                         load_bags)
-
-IMU_HEADER = "timestamp [ns], qat_x, qat_y, qat_z, qat_w, acc_x, acc_y, acc_z, ang_x, ang_y, ang_z"
-GPS_HEADER = "timestamp [ns], latitude, longitude, altitude"
-POSE_HEADER = "timestamp [ns], pose [affine]"
-
-IMU_FORMAT = "%d, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f"
-GPS_FORMAT = "%d, %10.20f, %10.20f, %10.20f"
-POSE_FORMAT = "%d, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f, %10.20f"
-
-
-def single_imu(msg, data):
-    imu_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
-    single = [msg_to_timestamp(msg)]
-
-    single += imu_dict["orientation"].values()
-    single += imu_dict["linear_acceleration"].values()
-    single += imu_dict["angular_velocity"].values()
-
-    # single += [0, 0, 0, 0]
-    # single += imu_dict["accel"].values()
-    # single += imu_dict["gyro"].values()
-
-    data.append(single)
-
-
-def export_imu(bags, topic, dir_out):
-    print(">> Extracting IMUs:")
-    manager = multiprocessing.Manager()
-    data = manager.list()
-
-    for idx, bag in enumerate(bags):
-        print("{}/{}: {}".format(idx + 1, len(bags), bag.filename))
-        bag_msgs = bag.read_messages(topics=[topic])
-        msg_count = bag.get_message_count(topic)
-
-        processes = []
-        for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-
-            # Start the process
-            p = multiprocessing.Process(target=single_imu, args=(msg, data))
-            proc_start_check(p, processes)
-        proc_join_all(processes)
-
-    data = np.array(data)
-    data_idx_sort = np.argsort(data, axis=0)
-    data = data[data_idx_sort[:, 0]]
-
-    filename = os.path.join(dir_out, "data.csv")
-    np.savetxt(
-        filename,
-        data,
-        fmt=IMU_FORMAT,
-        delimiter=",",
-        newline="\n",
-        header=IMU_HEADER,
-        footer="",
-        comments="# ",
-        encoding=None,
-    )
-
-
-def export_coordinates(bags, topic, dir_out):
-    print(">> Extracting coordinates:")
-    data = []
-    for idx, bag in enumerate(bags):
-        print("{}/{}: {}".format(idx + 1, len(bags), bag.filename))
-        bag_msgs = bag.read_messages(topics=[topic])
-        msg_count = bag.get_message_count(topic)
-
-        for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-            coor_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
-
-            single = [msg_to_timestamp(msg)]
-            single.append(coor_dict["latitude"])
-            single.append(coor_dict["longitude"])
-            single.append(coor_dict["altitude"])
-
-            if single[-1] == "nan":
-                single[-1] = 0
-
-            data.append(single)
-
-    data = np.array(data)
-    filename = os.path.join(dir_out, "data.csv")
-    np.savetxt(
-        filename,
-        data,
-        fmt=GPS_FORMAT,
-        delimiter=",",
-        newline="\n",
-        header=GPS_HEADER,
-        footer="",
-        comments="# ",
-        encoding=None,
-    )
-
-
-def export_poses(bags, topic, dir_out):
-    print(">> Extracting pose:")
-    data = []
-    for idx, bag in enumerate(bags):
-        print("{}/{}: {}".format(idx + 1, len(bags), bag.filename))
-        bag_msgs = bag.read_messages(topics=[topic])
-        msg_count = bag.get_message_count(topic)
-
-        for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-            coor_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
-
-            single: List[Any] = []
-            single.append(msg_to_timestamp(msg))
-
-            x = coor_dict["pose"]["position"]["x"]
-            y = coor_dict["pose"]["position"]["y"]
-            z = coor_dict["pose"]["position"]["z"]
-            position = np.array([x, y, z])
-            x = coor_dict["pose"]["orientation"]["x"]
-            y = coor_dict["pose"]["orientation"]["y"]
-            z = coor_dict["pose"]["orientation"]["z"]
-            w = coor_dict["pose"]["orientation"]["z"]
-            quaternion = np.array([x, y, z, w])
-
-            pose = Pose()
-            pose.setPosition(position)
-            pose.setQuaternion(quaternion)
-            single.extend(pose.getList())
-
-            data.append(single)
-
-    data = np.array(data)
-    filename = os.path.join(dir_out, "poses.csv")
-    np.savetxt(
-        filename,
-        data,
-        fmt=POSE_FORMAT,
-        delimiter=",",
-        newline="\n",
-        header=POSE_HEADER,
-        footer="",
-        comments="# ",
-        encoding=None,
-    )
-
-
-def single_image(msg, bridge, dir_out):
-    #  print(str(msg)[:500])
-    img_yuv422 = bridge.imgmsg_to_cv2(msg, desired_encoding="yuv422")
-    img_bgr = cv2.cvtColor(img_yuv422, cv2.COLOR_YUV2BGR_UYVY)
-
-    # Timestamp and file name
-    timestamp = msg_to_timestamp(msg)
-    filename = str(timestamp) + ".png"
-    paht_file = os.path.join(dir_out, filename)
-    cv2.imwrite(paht_file, img_bgr)
-
-
-def export_images(bags, topic, dir_out):
-    print(">> Extracting images:")
-
-    for idx, bag in enumerate(bags):
-        print("{}/{}: {}".format(idx + 1, len(bags), bag.filename))
-        bag_msgs = bag.read_messages(topics=[topic])
-        msg_count = bag.get_message_count(topic)
-        bridge = CvBridge()
-
-        processes = []
-        for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-
-            # Start the process
-            p = multiprocessing.Process(
-                target=single_image, args=(msg, bridge, dir_out)
-            )
-            proc_start_check(p, processes)
-        proc_join_all(processes)
-
-
-def export_nav_quat(bags, topic_nav, topic_quat, dir_out):
-    print(">> Extracting Navigation and Quaternion:")
-
-    nav = []
-    nav_ts = []
-    rots = []
-    quat_ts = []
-    for idx, bag in enumerate(bags):
-        print("{}/{}: {}".format(idx + 1, len(bags), bag.filename))
-        bag_nav_msgs = bag.read_messages(topics=[topic_nav])
-        msg_nav_count = bag.get_message_count(topic_nav)
-
-        bag_quat_msgs = bag.read_messages(topics=[topic_quat])
-        msg_quat_count = bag.get_message_count(topic_quat)
-
-        print("Nav:")
-        for idx, (_, msg_nav, _) in tqdm(enumerate(bag_nav_msgs), total=msg_nav_count):
-            ts = msg_to_timestamp(msg_nav)
-            nav_dict = yaml.load(str(msg_nav), Loader=yaml.FullLoader)
-            xyz = [nav_dict["latitude"], nav_dict["longitude"], nav_dict["altitude"]]
-            nav_ts.append(ts)
-            nav.append(xyz)
-
-        print("Quat:")
-        for idx, (_, msg, _) in tqdm(enumerate(bag_quat_msgs), total=msg_quat_count):
-            ts = msg_to_timestamp(msg)
-            quat_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
-            xyzw = [
-                quat_dict["quaternion"]["x"],
-                quat_dict["quaternion"]["y"],
-                quat_dict["quaternion"]["z"],
-                quat_dict["quaternion"]["w"],
-            ]
-            # rotate around x (we want to have z facing upwards, and not downwards)
-            calib = R.from_euler("x", [180], degrees=True).as_matrix()
-            # some arbitrary random rotation (seems like we need it)
-            rotz = R.from_euler("z", [90], degrees=True).as_matrix()
-            # rotation in the LiDAR Frame!
-            rot = rotz @ calib @ R.from_quat(xyzw).as_matrix() @ np.linalg.inv(calib)
-            quat_ts.append(ts)
-            rots.append(rot[0])
-
-    nav_ts = np.array(nav_ts)
-    nav = np.array(nav)
-    rots = np.array(rots)
-
-    poses = np.tile(np.eye(4), (rots.shape[0], 1, 1))
-    poses[:, :3, :3] = rots
-    poses[:, :3, -1] = nav
-    poses = poses.reshape(-1, 16)
-    time_poses = np.zeros((poses.shape[0], poses.shape[1] + 1))
-    time_poses[:, 0] = nav_ts
-    time_poses[:, 1:] = poses
-
-    #### Store to disk ####
-    dir_out = dir_out if dir_out[-1] == "/" else dir_out + "/"
-    os.makedirs(dir_out, exist_ok=True)
-    file_path = dir_out + "poses.txt"
-
-    np.savetxt(
-        file_path,
-        time_poses,
-        fmt=POSE_FORMAT,
-        delimiter=",",
-        newline="\n",
-        header=POSE_HEADER,
-        footer="",
-        comments="# ",
-        encoding=None,
-    )
-
-
-def msg_to_timestamp(msg):
-    # Trick to trim the message and parse the yaml
-    # data more efficiently.
-    msg = "\n".join(str(msg)[:200].split("\n")[:5])
-
-    # Extract seconds and nanoseconds
-    msg_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
-    stamp = msg_dict["header"]["stamp"]
-    sec = float(str(stamp["secs"]))
-    nsec = float(str(stamp["nsecs"]))
-
-    # Compose time in seconds
-    nsec_to_sec = nsec * 1e-9
-    time = decimal.Decimal(sec + nsec_to_sec)
-
-    # Convert time in nanoseconds
-    to_nsec = decimal.Decimal(1e9)
-    timestamp = int(time * to_nsec)
-
-    return timestamp
+from sensors.pose import PoseSensor
+from utils.tools import check_topic_bag, load_bags
 
 
 @click.command()
@@ -350,33 +75,7 @@ def msg_to_timestamp(msg):
     default="",
     help="Topic name of the poses",
 )
-@click.option(
-    "-s",
-    "--path_save",
-    type=click.Path(exists=False),
-    default="",
-    help="Where to store the results",
-)
-@click.option(
-    "--multi",
-    type=str,
-    default=False,
-    help="Does the path containe multiple bag files?",
-)
-def main(
-    path_bags,
-    velodyne,
-    ouster,
-    hokuyo,
-    imu,
-    coordinate,
-    image,
-    nav,
-    quat,
-    pose,
-    path_save,
-    multi,
-):
+def main(path_bags, velodyne, ouster, hokuyo, imu, coordinate, image, nav, quat, pose):
     """Convert a .bag file into multiple .ply files, one for each scan,
     including intensity information encoded on the color channel of the
     PointCloud. We use Open3D to convert the data from ROS to
@@ -386,51 +85,50 @@ def main(
     print("# RosBagExtraction     #")
     print("########################\n")
 
-    bags = load_bags(path_bags, multi)
-    path_root, _ = os.path.split(path_bags)
+    bags = load_bags(Path(path_bags))
 
     # Velodyne
     if velodyne:
-        velodyne_ext = LidarSensor(velodyne, bags, path_root, Lidar.VELODYNE)
+        velodyne_ext = LidarSensor(velodyne, bags, Lidar.VELODYNE)
         velodyne_ext.extract()
     # Ouster
     if ouster:
-        ouster_ext = LidarSensor(ouster, bags, path_root, Lidar.OUSTER)
+        ouster_ext = LidarSensor(ouster, bags, Lidar.OUSTER)
         ouster_ext.extract()
     # Hokuyo
     if hokuyo:
-        hokuyo_ext = LidarSensor(hokuyo, bags, path_root, Lidar.HOKUYO)
+        hokuyo_ext = LidarSensor(hokuyo, bags, Lidar.HOKUYO)
         hokuyo_ext.extract()
 
     ############
     # IMUs
     if check_topic_bag(imu, bags):
-        path_save_imu = create_folder(path_save, "imu")
-        export_imu(bags, imu, path_save_imu)
+        imu_ext = IMUSensor(imu, bags)
+        imu_ext.extract()
 
     ############
     # GPSs
     if check_topic_bag(coordinate, bags):
-        path_save_gps = create_folder(path_save, "coordinated")
-        export_coordinates(bags, coordinate, path_save_gps)
+        gps_ext = GPSSensor(coordinate, bags)
+        gps_ext.extract()
 
     ############
     # Images
     if check_topic_bag(image, bags):
-        path_save_images = create_folder(path_save, "images")
-        export_images(bags, image, path_save_images)
+        image_ext = ImageSensor(image, bags, encoding="yuv422")
+        image_ext.extract()
 
     ############
     # Nav + Quat
     if check_topic_bag(nav, bags) and check_topic_bag(quat, bags):
-        path_save_nav = create_folder(path_save, "nav")
-        export_nav_quat(bags, nav, quat, path_save_nav)
+        ins_ext = INSSensor(image, bags)
+        ins_ext.extract()
 
     ############
     # Poses
     if check_topic_bag(pose, bags):
-        path_save_poses = create_folder(path_save, "poses")
-        export_poses(bags, pose, path_save_poses)
+        pose_ext = PoseSensor(pose, bags)
+        pose_ext.extract()
 
     # Close all the bags
     for bag in bags:

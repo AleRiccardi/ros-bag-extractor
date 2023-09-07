@@ -1,20 +1,19 @@
 import multiprocessing
 import os
-from datetime import time
 
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from tqdm import tqdm
 
-from src.sensors.base import BaseSensor
-from src.utils.multiprocessors import proc_join_all, proc_start_check
-from src.utils.tools import msg_to_timestamp
+from sensors.base import BaseSensor
+from utils.multiprocessors import proc_join_all, proc_start_check
+from utils.tools import msg_to_timestamp
 
 
 class ImageSensor(BaseSensor):
-    def __init__(self, topic, bags, path_root, encoding="yuv422") -> None:
-        super().__init__(topic, bags, path_root, "images")
+    def __init__(self, topic, bags, encoding="yuv422") -> None:
+        super().__init__(topic, bags, "images")
         self._encoding = encoding
 
     def _print_init_msg(self):

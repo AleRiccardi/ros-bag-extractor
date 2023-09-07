@@ -24,12 +24,12 @@ class Lidar:
 
 
 class LidarSensor(BaseSensor):
-    CLOUD_HEADER = "timestamp [ns]"
-    CLOUD_FORMAT = "%s"
+    _HEADER = "timestamp [ns]"
+    _FORMAT = "%s"
     _POINT_TIME_AVAILABLE = False
 
-    def __init__(self, topic, bags, path_root, lidar=Lidar.VELODYNE) -> None:
-        super().__init__(topic, bags, path_root, lidar)
+    def __init__(self, topic, bags, lidar=Lidar.VELODYNE) -> None:
+        super().__init__(topic, bags, lidar)
 
         if lidar not in Lidar.list():
             raise ValueError('"{}" lidar sensor type not supported'.format(lidar))
@@ -179,12 +179,11 @@ class LidarSensor(BaseSensor):
         np.savetxt(
             filename,
             data,
-            fmt=self.CLOUD_FORMAT,
+            fmt=self._FORMAT,
             delimiter=",",
             newline="\n",
-            header=self.CLOUD_HEADER,
+            header=self._HEADER,
             footer="",
             comments="# ",
             encoding=None,
-        )
         )

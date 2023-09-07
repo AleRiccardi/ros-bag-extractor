@@ -1,5 +1,6 @@
 import decimal
 import os
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import rosbag
@@ -18,11 +19,10 @@ def check_topic_bag(topic, bags):
     return False
 
 
-def load_bags(path, multi):
+def load_bags(path: Path):
     list_bags = []
-    multi_bool = False if multi == "False" else True
-    if multi_bool:
-        for bag in os.listdir(path):
+    if path.is_dir():
+        for bag in path.glob("*.bag"):
             f_bag = os.path.join(path, bag)
             list_bags.append(f_bag)
     else:
