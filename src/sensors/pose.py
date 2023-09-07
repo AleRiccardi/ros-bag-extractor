@@ -6,8 +6,8 @@ import yaml
 from tqdm import tqdm
 
 from sensors.base import BaseSensor
-from utils.tools import msg_to_timestamp
 from utils.pose import Pose
+from utils.tools import msg_to_timestamp
 
 
 class PoseSensor(BaseSensor):

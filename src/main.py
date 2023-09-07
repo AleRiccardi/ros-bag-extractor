@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-import decimal
-import multiprocessing
-import os
 from pathlib import Path
 
 import click

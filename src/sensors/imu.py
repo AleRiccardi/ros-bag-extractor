@@ -31,8 +31,6 @@ class IMUSensor(BaseSensor):
 
             processes = []
             for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-
-                # Start the process
                 p = multiprocessing.Process(target=self._single_imu, args=(msg, data))
                 proc_start_check(p, processes)
             proc_join_all(processes)
