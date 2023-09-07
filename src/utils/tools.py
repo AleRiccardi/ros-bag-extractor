@@ -1,14 +1,17 @@
-import os
-import yaml
-import rosbag
 import decimal
+import os
+
+import matplotlib.pyplot as plt
+import rosbag
+import yaml
 
 
 def check_topic_bag(topic, bags):
     if topic:
         for bag in bags:
-            assert topic in bag.get_type_and_topic_info().topics, (
-                "topic: {} is not recorded in {}".format(topic, bag._filename))
+            assert (
+                topic in bag.get_type_and_topic_info().topics
+            ), "topic: {} is not recorded in {}".format(topic, bag._filename)
 
         return True
 
@@ -17,7 +20,8 @@ def check_topic_bag(topic, bags):
 
 def load_bags(path, multi):
     list_bags = []
-    if multi:
+    multi_bool = False if multi == "False" else True
+    if multi_bool:
         for bag in os.listdir(path):
             f_bag = os.path.join(path, bag)
             list_bags.append(f_bag)
@@ -59,7 +63,7 @@ def get_path_save(path_bags, path_save, multi):
     return path_save
 
 
-def msg_to_timestamp(msg):
+def msg_to_timestamp(msg) -> int:
     # Trick to trim the message and parse the yaml
     # data more efficiently.
     msg = "\n".join(str(msg)[:200].split("\n")[:5])
@@ -75,7 +79,12 @@ def msg_to_timestamp(msg):
     time = decimal.Decimal(sec + nsec_to_sec)
 
     # Convert time in nanoseconds
-    to_nsec = decimal.Decimal(1e+9)
+    to_nsec = decimal.Decimal(1e9)
     timestamp = int(time * to_nsec)
 
     return timestamp
+
+
+def display_image(img):
+    plot = plt.imshow(img)
+    plt.show()

@@ -1,15 +1,15 @@
 import os
-import yaml
-import open3d as o3d
+
 import numpy as np
-
-from tqdm import tqdm
-from sensor_msgs.msg import LaserScan
-from laser_geometry import LaserProjection
+import open3d as o3d
 import sensor_msgs.point_cloud2 as pc2
+import yaml
+from laser_geometry import LaserProjection
+from sensor_msgs.msg import LaserScan
+from tqdm import tqdm
 
+from sensors.base import BaseSensor
 from utils.tools import msg_to_timestamp
-from sensors.base import BaseExtraction
 
 
 class Lidar:
@@ -19,56 +19,44 @@ class Lidar:
 
     @staticmethod
     def list():
-        sensors_list = [
-            Lidar.HOKUYO,
-            Lidar.OUSTER,
-            Lidar.VELODYNE
-        ]
+        sensors_list = [Lidar.HOKUYO, Lidar.OUSTER, Lidar.VELODYNE]
         return sensors_list
 
 
-class LidarExtraction(BaseExtraction):
+class LidarSensor(BaseSensor):
     CLOUD_HEADER = "timestamp [ns]"
     CLOUD_FORMAT = "%s"
+    _POINT_TIME_AVAILABLE = False
 
-    def __init__(self, topic, bags, path_root, lidar=Lidar.VELODYNE, ) -> None:
+    def __init__(self, topic, bags, path_root, lidar=Lidar.VELODYNE) -> None:
         super().__init__(topic, bags, path_root, lidar)
 
-        if not lidar in Lidar.list():
-            raise ValueError(
-                "\"{}\" lidar sensor type not supported".format(lidar))
-        self.sensor: Lidar = lidar
-        self.name = lidar
-        self.available_point_time = False
+        if lidar not in Lidar.list():
+            raise ValueError('"{}" lidar sensor type not supported'.format(lidar))
 
-    def initialize(self):
+    def _print_init_msg(self):
         print(">> Extracting clouds:")
-        self.path_save = self.getPathSave()
 
-    def extract(self):
-        if not self.isAvailable():
-            return
-        self.initialize()
-
+    def _extract(self):
         data = []
 
-        for idx, bag in enumerate(self.bags):
-            print("{}/{}: {}".format(idx+1, len(self.bags), bag.filename))
-            bag_msgs = bag.read_messages(topics=[self.topic])
-            msg_count = bag.get_message_count(self.topic)
+        for idx, bag in enumerate(self._bags):
+            print("{}/{}: {}".format(idx + 1, len(self._bags), bag.filename))
+            bag_msgs = bag.read_messages(topics=[self._topic])
+            msg_count = bag.get_message_count(self._topic)
 
             for _, msg, _ in tqdm(bag_msgs, total=msg_count):
-                if self.sensor == Lidar.HOKUYO:
-                    self.singleHokuyo(msg, data)
-                elif self.sensor == Lidar.OUSTER:
-                    self.singleOuster(msg, data)
-                elif self.sensor == Lidar.VELODYNE:
-                    self.singleVelodyne(msg, data)
+                if self._name == Lidar.HOKUYO:
+                    self._single_hokuyo(msg, data)
+                elif self._name == Lidar.OUSTER:
+                    self._single_ouster(msg, data)
+                elif self._name == Lidar.VELODYNE:
+                    self._single_velodyne(msg, data)
 
         data = np.sort(np.array(data))
-        self.saveCSV(data)
+        self._save_csv(data)
 
-    def loadHokuyo(self, msg):
+    def _load_hokuyo(self, msg):
         data_yaml = yaml.safe_load(msg)
         scan = LaserScan(
             header=data_yaml["header"],
@@ -80,20 +68,21 @@ class LidarExtraction(BaseExtraction):
             range_min=data_yaml["range_min"],
             range_max=data_yaml["range_max"],
             ranges=data_yaml["ranges"],
-            intensities=data_yaml["intensities"])
+            intensities=data_yaml["intensities"],
+        )
 
         projector = LaserProjection()
         cloud = projector.projectLaser(scan)
         return cloud
 
-    def singleHokuyo(self, msg, data):
+    def _single_hokuyo(self, msg, data):
         msg = str(msg)
 
         try:
-            cloud = self.loadHokuyo(msg)
+            cloud = self._load_hokuyo(msg)
         except Exception as _:
             msg = msg.replace("nan", "60")
-            cloud = self.loadHokuyo(msg)
+            cloud = self._load_hokuyo(msg)
 
         # Timestamp and file name
         timestamp = msg_to_timestamp(msg)
@@ -108,9 +97,9 @@ class LidarExtraction(BaseExtraction):
 
         xyz_s = np.array(xyz_s)
         irt_s = np.array([])
-        self.savePLY(filename, xyz_s, irt_s)
+        self._save_ply(filename, xyz_s, irt_s)
 
-    def singleOuster(self, msg, data):
+    def _single_ouster(self, msg, data):
         # Ouster fields
         field_names = ["x", "y", "z", "intensity", "t", "ring"]
 
@@ -119,9 +108,9 @@ class LidarExtraction(BaseExtraction):
         filename = str(timestamp) + ".ply"
         data.append(filename)
 
-        points = pc2.read_points_list(cloud=msg,
-                                      field_names=field_names,
-                                      skip_nans=True)
+        points = pc2.read_points_list(
+            cloud=msg, field_names=field_names, skip_nans=True
+        )
         xyz_s = []
         irt_s = []
 
@@ -137,9 +126,9 @@ class LidarExtraction(BaseExtraction):
         xyz_s = np.array(xyz_s)
         irt_s = np.array(irt_s)
 
-        self.savePLY(filename, xyz_s, irt_s)
+        self._save_ply(filename, xyz_s, irt_s)
 
-    def singleVelodyne(self, msg, data):
+    def _single_velodyne(self, msg, data):
         ## Velodyne (standard)
         #  field_names = ["x", "y", "z", "intensity", "ring", "time"]
         # Velodyne (no point's time)
@@ -150,19 +139,19 @@ class LidarExtraction(BaseExtraction):
         filename = str(timestamp) + ".ply"
         data.append(filename)
 
-        points = pc2.read_points_list(cloud=msg,
-                                      field_names=field_names,
-                                      skip_nans=True)
+        points = pc2.read_points_list(
+            cloud=msg, field_names=field_names, skip_nans=True
+        )
 
         xyz_s = []
         irt_s = []
-        for pt in points:
-            if self.available_point_time:
-                x, y, z, i, r = pt
+        for point in points:
+            if _POINT_TIME_AVAILABLE:
+                x, y, z, i, r = point
                 xyz = [x, y, z]
                 irt = [i, r, 0]
             else:
-                x, y, z, i, r, t_s = pt
+                x, y, z, i, r, t_s = point
                 xyz = [x, y, z]
                 t_ms = int(t_s * 1e9)
                 irt = [i, r, t_ms]
@@ -173,10 +162,10 @@ class LidarExtraction(BaseExtraction):
         xyz_s = np.array(xyz_s)
         irt_s = np.array(irt_s)
 
-        self.savePLY(filename, xyz_s, irt_s)
+        self._save_ply(filename, xyz_s, irt_s)
 
-    def savePLY(self, name, points, normals):
-        filename = os.path.join(self.path_save, name)
+    def _save_ply(self, name, points, normals):
+        filename = os.path.join(self._path_save, name)
         o3d_cloud = o3d.geometry.PointCloud()
         o3d_cloud.points = o3d.utility.Vector3dVector(points)
 
@@ -185,14 +174,17 @@ class LidarExtraction(BaseExtraction):
 
         o3d.io.write_point_cloud(filename, o3d_cloud)
 
-    def saveCSV(self, data: np.ndarray):
-        filename = os.path.join(self.path_save, "data.csv")
-        np.savetxt(filename,
-                   data,
-                   fmt=self.CLOUD_FORMAT,
-                   delimiter=',',
-                   newline='\n',
-                   header=self.CLOUD_HEADER,
-                   footer='',
-                   comments='# ',
-                   encoding=None)
+    def _save_csv(self, data: np.ndarray):
+        filename = os.path.join(self._path_save, "data.csv")
+        np.savetxt(
+            filename,
+            data,
+            fmt=self.CLOUD_FORMAT,
+            delimiter=",",
+            newline="\n",
+            header=self.CLOUD_HEADER,
+            footer="",
+            comments="# ",
+            encoding=None,
+        )
+        )
