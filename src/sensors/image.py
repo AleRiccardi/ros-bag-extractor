@@ -15,7 +15,6 @@ class ImageSensor(BaseSensor):
     def __init__(self, topic, bags, encoding="yuv422") -> None:
         super().__init__(topic, bags, "images")
         self._encoding = encoding
-        self._bridge = CvBridge()
 
     def _print_init_msg(self):
         print(">> Extracting images:")
@@ -25,19 +24,22 @@ class ImageSensor(BaseSensor):
             print("{}/{}: {}".format(idx + 1, len(self._bags), bag.filename))
             bag_msgs = bag.read_messages(topics=[self._topic])
             msg_count = bag.get_message_count(self._topic)
+            bridge = CvBridge()
 
             processes = []
             for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
-                p = multiprocessing.Process(target=self._single_image, args=(msg))
+                p = multiprocessing.Process(
+                    target=self._single_image, args=(msg, bridge)
+                )
                 proc_start_check(p, processes)
             proc_join_all(processes)
 
-    def _single_image(self, msg):
+    def _single_image(self, msg, bridge):
         if self._encoding == "standard":
-            img_rgb = self._bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            img_rgb = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
             img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
         elif self._encoding == "yuv422":
-            img_yuv422 = self._bridge.imgmsg_to_cv2(msg, desired_encoding="yuv422")
+            img_yuv422 = bridge.imgmsg_to_cv2(msg, desired_encoding="yuv422")
             img_bgr = cv2.cvtColor(img_yuv422, cv2.COLOR_YUV2BGR_UYVY)
         else:
             raise RuntimeError(
