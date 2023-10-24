@@ -1,14 +1,15 @@
 import multiprocessing
 import os
+from typing import Any, Optional
 
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from tqdm import tqdm
 
-from sensors.base import BaseSensor
-from utils.multiprocessors import proc_join_all, proc_start_check
-from utils.tools import msg_to_timestamp
+from rbe.sensors.base import BaseSensor
+from rbe.utils.multiprocessors import proc_join_all, proc_start_check
+from rbe.utils.tools import msg_to_timestamp
 
 
 class ImageSensor(BaseSensor):
@@ -27,14 +28,14 @@ class ImageSensor(BaseSensor):
             bridge = CvBridge()
 
             processes = []
-            for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
+            for idx, (topic, msg, ts_bag) in tqdm(enumerate(bag_msgs), total=msg_count):
                 p = multiprocessing.Process(
-                    target=self._single_image, args=(msg, bridge)
+                    target=self._single_image, args=(msg, ts_bag, bridge)
                 )
                 proc_start_check(p, processes)
             proc_join_all(processes)
 
-    def _single_image(self, msg, bridge):
+    def _single_image(self, msg: str, ts_bag: Optional[Any], bridge):
         if self._encoding == "standard":
             img_rgb = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
             img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
@@ -45,7 +46,10 @@ class ImageSensor(BaseSensor):
             raise RuntimeError(
                 'Image encoding "{}" not supported.'.format(self._encoding)
             )
-        timestamp = msg_to_timestamp(msg)
+        if ts_bag is not None:
+            timestamp = ts_bag.to_nsec()
+        else:
+            timestamp = msg_to_timestamp(msg)
         self._save_image(img_bgr, timestamp)
 
     def _save_image(self, img: np.ndarray, timestamp: int):

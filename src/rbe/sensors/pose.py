@@ -27,11 +27,12 @@ class PoseSensor(BaseSensor):
             bag_msgs = bag.read_messages(topics=[self._topic])
             msg_count = bag.get_message_count(self._topic)
 
-            for idx, (_, msg, _) in tqdm(enumerate(bag_msgs), total=msg_count):
+            for idx, (topic, msg, t) in tqdm(enumerate(bag_msgs), total=msg_count):
                 coor_dict = yaml.load(str(msg), Loader=yaml.FullLoader)
 
                 single: List[Any] = []
-                single.append(msg_to_timestamp(msg))
+                single.append(t.to_nsec())
+                # single.append(msg_to_timestamp(msg))
 
                 x = coor_dict["pose"]["position"]["x"]
                 y = coor_dict["pose"]["position"]["y"]

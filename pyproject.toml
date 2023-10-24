@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "ros-bag-extractor"
+version = "0.0.0"
+authors = ["Alessandro Riccardi <ale.riccardi@outlook.com>"]
+description = "The \"ros-bag-extractor\" is a tool designed for extracting data from ROS bag files, converting raw measurements into an accessible and readable format for easy analysis."
+packages = [{ include = "rbe", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+click = "^8.1.7"
+matplotlib = "^3.8.0"
+numpy = "^1.26.1"
+open3d = "^0.17.0"
+scipy = "^1.11.3"
+tqdm = "^4.66.1"
+opencv-python-headless = "^4.8.1.78"
+
+[tool.poetry.dev-dependencies]
+autoflake = "^2.0.1"
+pylint = "2.15.5"
+black = "22.6.0"
+isort = "5.10.1"
+pytest = "7.2.0"
+pre-commit = "3.1.1"
+anybadge = "1.9.0"
+
+[tool.poetry.group.dev.dependencies]
+ipdb = "^0.13.11"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[pytest]
+log_cli = true
+
+[tool.poetry_bumpversion.file."src/mlp/__init__.py"]
