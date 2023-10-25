@@ -5,12 +5,12 @@
 # @author Alessandro Riccardi
 # @version 0.1.0
 
-source $MLP_PATH/configs/scripts/sh/functions.sh
+source $RBE_PATH/configs/scripts/sh/functions.sh
 
 path_rel=$1
 
 if [[ $path_rel == "" ]]; then
-    path_abs=$MLP_PATH
+    path_abs=$RBE_PATH
 else
     path_abs="$PWD/$path_rel"
 fi

@@ -6,9 +6,8 @@ import sensor_msgs.point_cloud2 as pc2
 import yaml
 from laser_geometry import LaserProjection
 from sensor_msgs.msg import LaserScan
-from tqdm import tqdm
-
 from sensors.base import BaseSensor
+from tqdm import tqdm
 from utils.tools import msg_to_timestamp
 
 
@@ -80,7 +79,7 @@ class LidarSensor(BaseSensor):
 
         try:
             cloud = self._load_hokuyo(msg)
-        except Exception as _:
+        except Exception:
             msg = msg.replace("nan", "60")
             cloud = self._load_hokuyo(msg)
 

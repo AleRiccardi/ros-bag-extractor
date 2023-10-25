@@ -19,7 +19,11 @@ CYAN='\e[0;36m'
 NC='\e[0m'
 
 function print_info() {
-    echo -e "${BLUE}${1}${NC}"
+    echo -e "${PURPLE}${1}${NC}"
+}
+
+function print_green() {
+    echo -e "${GREEN}${1}${NC}"
 }
 
 function print_ok() {
@@ -45,19 +49,35 @@ function fill_line() {
     builtin printf -vl "%${2:-${COLUMNS:-$(tput cols 2>&- || echo 80)}}s" && echo -e "${l// /${1:-=}}"
 }
 
+function make_capital() {
+    text=$(echo "${1}" | tr 'a-z' 'A-Z')
+    echo $text
+}
+
 function print_intro() {
+    text=$(make_capital "${1}")
     echo
-    fill_line "+"
-    print_info " ${1}"
-    fill_line "+"
+    fill_line "="
+    print_info " ${text}"
+    fill_line "="
 }
 
 function print_title() {
+    text=$(make_capital "${1}")
     echo
-    fill_line "="
-    print_info " ${1}"
-    fill_line "="
+    print_info " ${text}"
+    fill_line "-"
+    echo
 }
+
+function print_success() {
+    text=$(make_capital "${1}")
+    echo
+    print_green " ${text}"
+    fill_line "-"
+    echo
+}
+
 
 function get_value() {
     param="${1}="
@@ -114,8 +134,8 @@ function replace() {
     file_path=${3}
 
     value=$(path_correction $value)
-    from="$param=\"(.*?)\"" 
-    to="$param=\"$value\"" 
+    from="$param=\"(.*?)\""
+    to="$param=\"$value\""
 
     sed -i -E "s/$from/$to/g" $file_path
 }
@@ -126,7 +146,7 @@ function type_n_replace() {
     message=" - ${3}"
     file_path=${4}
 
-    read -p "$message [$value]: " 
+    read -p "$message [$value]: "
 
     value_tmp=${REPLY}
     if [[ $value_tmp != "" ]]; then
@@ -173,11 +193,11 @@ function ask_yes_no() {
     while true; do
         read -p "$message [y/n]: " yn
         case $yn in
-            [Yy]* ) 
+            [Yy]* )
                 answer=true
                 break
                 ;;
-            [Nn]* ) 
+            [Nn]* )
                 answer=false
                 break
                 ;;
@@ -220,5 +240,27 @@ function wait_for_service() {
 }
 
 function find_conda_env(){
-    conda env list | grep "${1}" 
+    conda env list | grep "${1}"
+}
+
+function poetry_path() {
+    path_env=$(poetry env list --full-path)
+    result=$?
+
+    if [[ $result != 0 ]]; then
+        echo "Aborting."
+        return $result
+    fi
+
+
+    if [[ $path_env =~ "Activate" ]]; then
+        path_env=$(echo $path_env | grep Activated | cut -d' ' -f1 )
+        result=$?
+
+        if [[ $result != 0 ]]; then
+            echo "Aborting."
+            return $result
+        fi
+    fi
+    echo $path_env
 }

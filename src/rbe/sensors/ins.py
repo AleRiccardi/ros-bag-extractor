@@ -1,11 +1,8 @@
-import os
-
 import numpy as np
 import yaml
 from scipy.spatial.transform import Rotation as R
-from tqdm import tqdm
-
 from sensors.base import BaseSensor
+from tqdm import tqdm
 from utils.tools import msg_to_timestamp
 
 

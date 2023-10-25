@@ -3,11 +3,9 @@ from typing import Any, List
 
 import numpy as np
 import yaml
-from tqdm import tqdm
-
 from sensors.base import BaseSensor
+from tqdm import tqdm
 from utils.pose import Pose
-from utils.tools import msg_to_timestamp
 
 
 class PoseSensor(BaseSensor):

@@ -6,7 +6,7 @@ rm -rf .pylint && mkdir -p .pylint/
 # -----------------------------------------------------------------------------
 # Analysis
 
-SOURCE_PATH=src/mlp
+SOURCE_PATH=tomeye/
 PYLINT_REPORT_FILE=.pylint/report.txt
 touch $PYLINT_REPORT_FILE
 

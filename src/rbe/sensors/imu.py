@@ -3,9 +3,8 @@ import os
 
 import numpy as np
 import yaml
-from tqdm import tqdm
-
 from sensors.base import BaseSensor
+from tqdm import tqdm
 from utils.multiprocessors import proc_join_all, proc_start_check
 from utils.tools import msg_to_timestamp
 

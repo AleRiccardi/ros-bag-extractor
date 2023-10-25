@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import math
-import numpy as np
-
 from copy import copy
 from typing import List
+
+import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 
 class Pose:
-
-    def __init__(self, matrix: np.ndarray = None, rotation: np.ndarray = None, position: np.ndarray = None, timestamp: int = 0) -> None:
+    def __init__(
+        self,
+        matrix: np.ndarray = None,
+        rotation: np.ndarray = None,
+        position: np.ndarray = None,
+        timestamp: int = 0,
+    ) -> None:
         self.timestamp = int(timestamp)
         self._pose = np.eye(4)
 
@@ -62,7 +67,7 @@ class Pose:
         # [Roll, pith, yaw]
         euler = np.array([x, y, z])
         if degree:
-            euler *= 180/np.pi
+            euler *= 180 / np.pi
         return euler
 
     def getQuaternion(self):

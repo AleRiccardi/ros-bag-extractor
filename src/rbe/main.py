@@ -3,13 +3,13 @@ from pathlib import Path
 
 import click
 
-from sensors.gps import GPSSensor
-from sensors.image import ImageSensor
-from sensors.imu import IMUSensor
-from sensors.ins import INSSensor
-from sensors.lidar import Lidar, LidarSensor
-from sensors.pose import PoseSensor
-from utils.tools import check_topic_bag, load_bags
+from rbe.sensors.gps import GPSSensor
+from rbe.sensors.image import ImageSensor
+from rbe.sensors.imu import IMUSensor
+from rbe.sensors.ins import INSSensor
+from rbe.sensors.lidar import Lidar, LidarSensor
+from rbe.sensors.pose import PoseSensor
+from rbe.utils.tools import check_topic_bag, load_bags, read_rosbag
 
 
 @click.command()
@@ -82,6 +82,7 @@ def main(path_bags, velodyne, ouster, hokuyo, imu, coordinate, image, nav, quat,
     print("# RosBagExtraction     #")
     print("########################\n")
 
+    bags = read_rosbag(path_bags)
     bags = load_bags(Path(path_bags))
 
     # Velodyne
