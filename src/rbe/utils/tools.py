@@ -3,11 +3,8 @@ import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import rosbag2_py
+import rosbag
 import yaml
-from rclpy.serialization import deserialize_message
-from rosidl_runtime_py.utilities import get_message
-from std_msgs.msg import String
 
 
 def check_topic_bag(topic, bags):
@@ -20,47 +17,6 @@ def check_topic_bag(topic, bags):
         return True
 
     return False
-
-
-def get_rosbag_options(path, storage_id, serialization_format="cdr"):
-    storage_options = rosbag2_py.StorageOptions(uri=path, storage_id=storage_id)
-
-    converter_options = rosbag2_py.ConverterOptions(
-        input_serialization_format=serialization_format,
-        output_serialization_format=serialization_format,
-    )
-
-    return storage_options, converter_options
-
-
-def read_rosbag(bag_path):
-    storage_options, converter_options = get_rosbag_options(bag_path, "mcap")
-
-    reader = rosbag2_py.SequentialReader()
-    reader.open(storage_options, converter_options)
-
-    topic_types = reader.get_all_topics_and_types()
-
-    # Create a map for quicker lookup
-    type_map = {
-        topic_types[i].name: topic_types[i].type for i in range(len(topic_types))
-    }
-
-    # Set filter for topic of string type
-    storage_filter = rosbag2_py.StorageFilter(topics=["/topic"])
-    reader.set_filter(storage_filter)
-
-    msg_counter = 0
-
-    while reader.has_next():
-        (topic, data, t) = reader.read_next()
-        msg_type = get_message(type_map[topic])
-        msg = deserialize_message(data, msg_type)
-
-        assert isinstance(msg, String)
-        assert msg.data == f"Hello, world! {msg_counter}"
-
-        msg_counter += 1
 
 
 def load_bags(path: Path):
@@ -78,6 +34,7 @@ def load_bags(path: Path):
         print("Loading: {}".format(bag_name))
         bags.append(rosbag.Bag(path_bag))
     print()
+
     return bags
 
 

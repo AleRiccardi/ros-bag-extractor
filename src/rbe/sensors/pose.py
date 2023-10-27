@@ -3,9 +3,10 @@ from typing import Any, List
 
 import numpy as np
 import yaml
-from sensors.base import BaseSensor
 from tqdm import tqdm
-from utils.pose import Pose
+
+from rbe.sensors.base import BaseSensor
+from rbe.utils.pose import Pose
 
 
 class PoseSensor(BaseSensor):

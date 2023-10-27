@@ -6,9 +6,10 @@ import sensor_msgs.point_cloud2 as pc2
 import yaml
 from laser_geometry import LaserProjection
 from sensor_msgs.msg import LaserScan
-from sensors.base import BaseSensor
 from tqdm import tqdm
-from utils.tools import msg_to_timestamp
+
+from rbe.sensors.base import BaseSensor
+from rbe.utils.tools import msg_to_timestamp
 
 
 class Lidar:

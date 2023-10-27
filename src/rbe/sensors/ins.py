@@ -1,9 +1,10 @@
 import numpy as np
 import yaml
 from scipy.spatial.transform import Rotation as R
-from sensors.base import BaseSensor
 from tqdm import tqdm
-from utils.tools import msg_to_timestamp
+
+from rbe.sensors.base import BaseSensor
+from rbe.utils.tools import msg_to_timestamp
 
 
 class INSSensor(BaseSensor):

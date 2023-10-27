@@ -3,10 +3,11 @@ import os
 
 import numpy as np
 import yaml
-from sensors.base import BaseSensor
 from tqdm import tqdm
-from utils.multiprocessors import proc_join_all, proc_start_check
-from utils.tools import msg_to_timestamp
+
+from rbe.sensors.base import BaseSensor
+from rbe.utils.multiprocessors import proc_join_all, proc_start_check
+from rbe.utils.tools import msg_to_timestamp
 
 
 class IMUSensor(BaseSensor):
