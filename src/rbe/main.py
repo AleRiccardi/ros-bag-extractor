@@ -56,28 +56,23 @@ from rbe.utils.tools import check_topic_bag, load_bags
 )
 @click.option(
     "--nav",
-    type=click.Path(exists=False),
+    type=str,
     default="",
-    help="Topic name of the sbg ekf navigation sistem",
+    help="Topic name of the sbg ekf navigation system",
 )
 @click.option(
     "--quat",
-    type=click.Path(exists=False),
+    type=str,
     default="",
-    help="Topic name of the sbg ekf quaternion sistem",
+    help="Topic name of the sbg ekf quaternion system",
 )
 @click.option(
     "--pose",
-    type=click.Path(exists=False),
+    type=str,
     default="",
     help="Topic name of the poses",
 )
 def main(path_bags, velodyne, ouster, hokuyo, imu, coordinate, image, nav, quat, pose):
-    """Convert a .bag file into multiple .ply files, one for each scan,
-    including intensity information encoded on the color channel of the
-    PointCloud. We use Open3D to convert the data from ROS to
-    o3d.geometry.PointCloud.
-    """
     print("\n########################")
     print("# RosBagExtraction     #")
     print("########################\n")
